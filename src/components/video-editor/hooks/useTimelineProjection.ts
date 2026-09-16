@@ -1,12 +1,13 @@
 /* biome-ignore-all lint/correctness/useExhaustiveDependencies: mutable timeline bootstrap refs intentionally do not trigger effects. */
 import { type MutableRefObject, useCallback, useEffect, useMemo } from "react";
+import { projectCaptionCues } from "../captionTimeline";
 import { deriveNextId } from "../projectPersistence";
 import type { useTimelineState } from "../state/useTimelineState";
 import {
-	type CaptionCue,
 	clipsToTrims,
 	extendAutoFullTrackClip,
 	getClipSourceEndMs,
+	getClipSourceStartMs,
 	getTimelineDurationMs,
 	mapSourceTimeToTimelineTime,
 	mapTimelineTimeToSourceTime,
@@ -88,28 +89,12 @@ export function useTimelineProjection({
 		(timeMs: number) => mapSourceTimeToTimelineTime(timeMs, clipRegions),
 		[clipRegions],
 	);
-	const effectiveZoomRegions = useMemo<ZoomRegion[]>(
-		() =>
-			zoomRegions.map((region) => ({
-				...region,
-				startMs: toSourceTime(region.startMs),
-				endMs: toSourceTime(region.endMs),
-			})),
-		[zoomRegions, toSourceTime],
+	const effectiveZoomRegions: ZoomRegion[] = zoomRegions;
+	const effectiveCaptionRegions = useMemo(
+		() => projectCaptionCues(autoCaptions, clipRegions),
+		[autoCaptions, clipRegions],
 	);
-	const effectiveCaptionRegions = useMemo<CaptionCue[]>(
-		() =>
-			autoCaptions.map((cue) => ({
-				...cue,
-				startMs: toTimelineTime(cue.startMs),
-				endMs: toTimelineTime(cue.endMs),
-			})),
-		[autoCaptions, toTimelineTime],
-	);
-	const timelinePlayheadTime = useMemo(
-		() => toTimelineTime(currentTime * 1000) / 1000,
-		[currentTime, toTimelineTime],
-	);
+	const timelinePlayheadTime = currentTime;
 	const timelineDuration = useMemo(
 		() => getTimelineDurationMs(clipRegions, duration * 1000) / 1000,
 		[clipRegions, duration],
@@ -119,7 +104,7 @@ export function useTimelineProjection({
 			.filter(({ speed }) => speed !== 1)
 			.map((clip) => ({
 				id: `clip-speed-${clip.id}`,
-				startMs: clip.startMs,
+				startMs: getClipSourceStartMs(clip),
 				endMs: getClipSourceEndMs(clip),
 				speed: clip.speed as SpeedRegion["speed"],
 			}));
